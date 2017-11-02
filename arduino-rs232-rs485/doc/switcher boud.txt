@@ -1,0 +1,12 @@
+u = up
+d = down
+
+n 1 2 3 4 boud
+1 d d d _ 600
+2 u d d _ 1200
+3 d u d _ 2400
+4 u u d _ 4800
+5 d d u _ 9600
+6 u d u _ 19200
+7 d u u _ 38400
+8 u u u _ 57600

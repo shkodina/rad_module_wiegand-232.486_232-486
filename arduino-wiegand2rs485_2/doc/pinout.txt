@@ -1,0 +1,9 @@
+wiegand D0 - 2
+wiegand D1 - 3
+
+232 RX - 0
+232 TX - 1
+
+485 TX - 8
+485 DE - 9
+485 RX - 10
