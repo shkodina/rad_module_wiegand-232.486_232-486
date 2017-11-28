@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 //========================================================================== 
 //             RS485         
@@ -14,8 +14,8 @@
 #define RS485Transmit    HIGH
 #define RS485Receive     LOW
 
-#define Pin13LED         6
-#define Pin7LED         7
+#define PinGreedLED         6
+#define PinRedLED         7
 
 SoftwareSerial RS485Serial(SSerialRX, SSerialTX); // RX, TX
 
@@ -77,8 +77,8 @@ void ISR_INT1()
 //========================================================================== 
 void setup() {
 
-  pinMode(Pin13LED, OUTPUT);   
-  pinMode(Pin7LED, OUTPUT);   
+  pinMode(PinGreedLED, OUTPUT);   
+  pinMode(PinRedLED, OUTPUT);   
 
   // RS485
   pinMode(SSerialTxControl1, OUTPUT);       
@@ -114,7 +114,7 @@ void sendLongToRs485(long val)
       RS485Serial.write(*c);          // Send byte to Remote Arduino  
     }
 
-    digitalWrite(Pin13LED, LOW);  // Show activity    
+    //digitalWrite(Pin13LED, LOW);  // Show activity    
     delay(10);
     digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit        
 }
@@ -128,7 +128,7 @@ void sendLongToRs232(long val)
       Serial.write(*c);          // Send byte to Remote Arduino  
     }
 
-    digitalWrite(Pin7LED, LOW);  // Show activity    
+    //digitalWrite(PinGreedLED, LOW);  // Show activity    
     delay(10);
 }
 
@@ -137,11 +137,30 @@ void sendLongToRs232(long val)
 //             MAIN         
 //========================================================================== 
 
+void blink_ok (){
+  digitalWrite(PinGreedLED, LOW);
+  delay(150);
+  digitalWrite(PinGreedLED, HIGH);
+  delay(150);
+  digitalWrite(PinGreedLED, LOW);
+  delay(150);
+}
+
+void blink_error (){
+  digitalWrite(PinGreedLED, LOW);
+  digitalWrite(PinRedLED, HIGH);
+  delay(150);
+  digitalWrite(PinRedLED, LOW);
+  delay(150);
+  digitalWrite(PinRedLED, HIGH);
+  delay(150);
+  digitalWrite(PinRedLED, LOW);
+}
+
 void loop() {
 
   //long x = 305441741;
-  digitalWrite(Pin13LED, HIGH);  // Show activity
-  digitalWrite(Pin7LED, HIGH);  // Show activity
+  digitalWrite(PinGreedLED, HIGH);  // Show activity
   // This waits to make sure that there have been no more data pulses before processing data
   if (!flagDone) {
     if (--weigand_counter == 0)
@@ -231,6 +250,7 @@ void loop() {
       #ifdef DEBUG_MODE
       Serial.println("Unable to decode."); 
       #endif
+      blink_error ();
     }
  
      // cleanup and get ready for the next card
@@ -259,4 +279,6 @@ void printBits()
       #ifndef DEBUG_MODE
       sendLongToRs232(cardCode);
       #endif
+
+      blink_ok();
 }
