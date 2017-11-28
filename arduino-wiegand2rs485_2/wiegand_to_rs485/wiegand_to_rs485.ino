@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 //========================================================================== 
 //             RS485         
@@ -207,18 +207,18 @@ void loop() {
     // we will decode the bits differently depending on how many bits we have
     // see www.pagemac.com/azure/data_formats.php for mor info
     
-    if (bitCount == 35)
+    if (bitCount == 37)
     {
-      // 35 bit HID Corporate 1000 format
-      // facility code = bits 2 to 14
-      for (i=2; i<14; i++)
+      // 37 bit HID Corporate H10304 format
+      // facility code = bits 1 to 16
+      for (i=4; i<=19; i++)
       {
          facilityCode <<=1;
          facilityCode |= databits[i];
       }
  
-      // card code = bits 15 to 34
-      for (i=14; i<34; i++)
+      // card code = bits 15 to 35 ???
+      for (i=20; i<=35; i++)
       {
          cardCode <<=1;
          cardCode |= databits[i];
