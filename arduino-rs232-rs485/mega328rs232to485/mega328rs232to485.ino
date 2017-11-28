@@ -51,7 +51,8 @@ long getSelectedBoud(){
     digitalWrite(PinLEDg, HIGH);    
     delay(200);
   }
-
+  digitalWrite(PinLEDg, LOW);
+  
   return BOUDS[bpos];
 }
 
@@ -89,14 +90,18 @@ void loop() {
 
   // put your main code here, to run repeatedly:
   if (RS485Serial.available()){
-    digitalWrite(PinLEDg, LOW);  // Show activity
     
-    while (RS485Serial.available()){
-      Serial.write(RS485Serial.read());  
+    digitalWrite(PinLEDg, HIGH);  // Show activity
+    digitalWrite(PinLEDr, HIGH);  // Show activity
+    while (RS485Serial.available()){ 
+      Serial.write(RS485Serial.read());       
     }
-    //delay(10);
+    //delay(1);
+    digitalWrite(PinLEDg, LOW); 
+    digitalWrite(PinLEDr, LOW); 
     
-    digitalWrite(PinLEDg, HIGH);  
+    
+     
   }
 
 }
@@ -110,11 +115,11 @@ void loop() {
 
 void serialEvent() {  
   digitalWrite(SSerialTxControl1, RS485Transmit);  // Enable RS485 Transmit 
-  digitalWrite(PinLEDr, LOW);  // Show activity
+  digitalWrite(PinLEDg, HIGH);  // Show activity
   while (Serial.available()) {
     RS485Serial.write(Serial.read());  
   }
-  digitalWrite(PinLEDr, HIGH);  
+  digitalWrite(PinLEDg, LOW);  
   digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit
 }
 
