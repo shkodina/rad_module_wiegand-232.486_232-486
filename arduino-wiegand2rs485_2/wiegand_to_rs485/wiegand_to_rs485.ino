@@ -1,7 +1,9 @@
 
 #include <SoftwareSerial.h>
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
+#define PARSE_WIEGAND_37
+#define PARSE_WIEGAND_26
 
 //========================================================================== 
 //             RS485         
@@ -37,6 +39,8 @@ unsigned int weigand_counter;        // countdown until we assume there are no m
  
 unsigned long facilityCode=0;        // decoded facility code
 unsigned long cardCode=0;            // decoded card code
+
+uint64_t undecodeable_code=0;        // if cannot decode will send this
 
 const byte interruptPin_green = 2;   // DO
 const byte interruptPin_white = 3;   // D1 
@@ -119,6 +123,13 @@ void sendLongToRs485(long val)
     digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit        
 }
 
+void sendLong64ToRs485(long val){
+  long * pl;
+  pl = (long*)&val;
+  sendLongToRs485(*pl);
+  pl++;
+  sendLongToRs485(*pl);
+}
 //==========================================================================
 
 void sendLongToRs232(long val)
@@ -132,6 +143,13 @@ void sendLongToRs232(long val)
     delay(10);
 }
 
+void sendLong64ToRs232(uint64_t val){
+  long * pl;
+  pl = (long*)&val;
+  sendLongToRs232(*pl);
+  pl++;
+  sendLongToRs232(*pl);
+}
 
 //========================================================================== 
 //             MAIN         
@@ -173,6 +191,8 @@ void loop() {
 
     unsigned int lv = 0;
 
+    undecodeable_code = 0;
+
     #ifdef DEBUG_MODE
     Serial.print("Data: ");
     #endif
@@ -187,8 +207,10 @@ void loop() {
 
       #endif  
 
-      if (databits[bitCount-i-1])
+      if (databits[bitCount-i-1]){
         lv |= 1 << i;  
+        undecodeable_code |= (uint64_t)1 << i;
+      }
     }
 
     #ifdef DEBUG_MODE
@@ -209,6 +231,8 @@ void loop() {
     
     if (bitCount == 37)
     {
+      #ifdef PARSE_WIEGAND_37
+      
       // 37 bit HID Corporate H10304 format
       // facility code = bits 1 to 16
       for (i=4; i<=19; i++)
@@ -225,9 +249,17 @@ void loop() {
       }
  
       printBits();
+
+      #endif // PARSE_WIEGAND_37
+      
+      #ifndef PARSE_WIEGAND_37
+        printLong64Bits(undecodeable_code);
+      #endif
+      
     }
     else if (bitCount == 26)
     {
+      #ifdef PARSE_WIEGAND_26
       // standard 26 bit format
       // facility code = bits 2 to 9
       for (i=1; i<9; i++)
@@ -244,6 +276,13 @@ void loop() {
       }
  
       printBits();  
+
+      #endif // PARSE_WIEGAND_26
+        
+      #ifndef PARSE_WIEGAND_26
+        printLong32Bits(lv);
+      #endif
+      
     }
     else {
       // you can add other formats if you want!
@@ -251,6 +290,13 @@ void loop() {
       Serial.println("Unable to decode."); 
       #endif
       blink_error ();
+      
+      sendLong64ToRs485(undecodeable_code);
+      
+      #ifndef DEBUG_MODE
+      sendLong64ToRs232(undecodeable_code);
+      #endif
+
     }
  
      // cleanup and get ready for the next card
@@ -278,6 +324,28 @@ void printBits()
       
       #ifndef DEBUG_MODE
       sendLongToRs232(cardCode);
+      #endif
+
+      blink_ok();
+}
+
+void printLong64Bits(uint64_t data)
+{
+      sendLong64ToRs485(data);
+      
+      #ifndef DEBUG_MODE
+      sendLong64ToRs232(data);
+      #endif
+
+      blink_ok();
+}
+
+void printLong32Bits(uint32_t data)
+{
+      sendLongToRs485(data);
+      
+      #ifndef DEBUG_MODE
+      sendLongToRs232(data);
       #endif
 
       blink_ok();
