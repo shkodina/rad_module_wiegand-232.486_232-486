@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 #define PARSE_WIEGAND_37
 #define PARSE_WIEGAND_26
 
@@ -122,8 +122,8 @@ void sendLongToRs485(long val)
     delay(10);
     digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit        
 }
-
-void sendLong64ToRs485(long val){
+//===============================================================================
+void sendLong64ToRs485(uint64_t val){
   long * pl;
   pl = (long*)&val;
   sendLongToRs485(*pl);
@@ -142,6 +142,7 @@ void sendLongToRs232(long val)
     //digitalWrite(PinGreedLED, LOW);  // Show activity    
     delay(10);
 }
+//===============================================================================
 
 void sendLong64ToRs232(uint64_t val){
   long * pl;
@@ -154,7 +155,6 @@ void sendLong64ToRs232(uint64_t val){
 //========================================================================== 
 //             MAIN         
 //========================================================================== 
-
 void blink_ok (){
   digitalWrite(PinGreedLED, LOW);
   delay(150);
@@ -163,7 +163,7 @@ void blink_ok (){
   digitalWrite(PinGreedLED, LOW);
   delay(150);
 }
-
+//===============================================================================
 void blink_error (){
   digitalWrite(PinGreedLED, LOW);
   digitalWrite(PinRedLED, HIGH);
@@ -174,7 +174,7 @@ void blink_error (){
   delay(150);
   digitalWrite(PinRedLED, LOW);
 }
-
+//===============================================================================
 void loop() {
 
   //long x = 305441741;
@@ -309,7 +309,7 @@ void loop() {
      }
   }
 }
-
+//===============================================================================
 void printBits()
 {
       // I really hope you can figure out what this function does
@@ -328,7 +328,7 @@ void printBits()
 
       blink_ok();
 }
-
+//===============================================================================
 void printLong64Bits(uint64_t data)
 {
       sendLong64ToRs485(data);
@@ -339,7 +339,7 @@ void printLong64Bits(uint64_t data)
 
       blink_ok();
 }
-
+//===============================================================================
 void printLong32Bits(uint32_t data)
 {
       sendLongToRs485(data);
