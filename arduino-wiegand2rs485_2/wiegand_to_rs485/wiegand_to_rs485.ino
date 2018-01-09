@@ -1,7 +1,9 @@
 
 #include <SoftwareSerial.h>
+#include "toemreader232w.h"
 
-//#define DEBUG_MODE
+
+#define DEBUG_MODE
 #define PARSE_WIEGAND_37
 #define PARSE_WIEGAND_26
 
@@ -284,6 +286,30 @@ void loop() {
       #endif
       
     }
+    else if (bitCount == 32){
+    
+      #ifdef DEBUG_MODE
+      Serial.println(""); 
+      Serial.println("------ Wiegang 32 ------");      
+      #endif
+
+      for (i=0; i<=15; i++)
+      {
+         facilityCode <<=1;
+         facilityCode |= databits[i];
+      }
+ 
+      // card code = bits 10 to 23
+      for (i=16; i<=31; i++)
+      {
+         cardCode <<=1;
+         cardCode |= databits[i];
+      }
+ 
+      printBits();  
+
+      
+    } 
     else {
       // you can add other formats if you want!
       #ifdef DEBUG_MODE
@@ -296,6 +322,7 @@ void loop() {
       #ifndef DEBUG_MODE
       sendLong64ToRs232(undecodeable_code);
       #endif
+
 
     }
  
@@ -318,6 +345,18 @@ void printBits()
       Serial.print(facilityCode);
       Serial.print(", CC = ");
       Serial.println(cardCode); 
+
+      uint8_t buff[25];
+      uint8_t l = g_toemreader232w_p->buildMessage(buff, 25, 0x73, facilityCode, cardCode);
+      Serial.println("");
+      for (uint8_t i = 0; i < l; i++){
+        Serial.write(buff[i]);
+      }
+      Serial.println("*");
+       
+      
+
+      
       #endif
       
       sendLongToRs485(cardCode);
