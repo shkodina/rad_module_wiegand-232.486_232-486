@@ -4,8 +4,6 @@
 
 
 #define DEBUG_MODE
-#define PARSE_WIEGAND_37
-#define PARSE_WIEGAND_26
 
 //========================================================================== 
 //             RS485         
@@ -28,7 +26,7 @@ SoftwareSerial RS485Serial(SSerialRX, SSerialTX); // RX, TX
 //========================================================================== 
 
 //========================================================================== 
-//             WIEGAND         
+//             WIEGAND   SETTINGS      
 //========================================================================== 
 
 #define MAX_BITS 100                 // max number of bits 
@@ -106,11 +104,223 @@ void setup() {
 
  
 }
-
 //========================================================================== 
-//             RS 485 UTILS         
+//             UTILS         
 //========================================================================== 
+void sendBufToRs485(uint8_t* buff, uint8_t bufflen){
+    digitalWrite(SSerialTxControl1, RS485Transmit);  // Enable RS485 Transmit 
+    for (uint8_t i = 0; i < bufflen; i++){
+      RS485Serial.write(buff[i]);          // Send byte to Remote Arduino  
+    }
+    delay(10);
+    digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit        
+}
+//==========================================================================
+void sendBufToRs232(uint8_t* buff, uint8_t bufflen){
+    for (uint8_t i = 0; i < bufflen; i++){
+      Serial.write(buff[i]);          // Send byte to Remote Arduino  
+    }
+}
+//========================================================================== 
+void blink_ok (){
+  digitalWrite(PinGreedLED, LOW);
+  delay(150);
+  digitalWrite(PinGreedLED, HIGH);
+  delay(150);
+  digitalWrite(PinGreedLED, LOW);
+  delay(150);
+}
+//==========================================================================
+void blink_error (){
+  digitalWrite(PinGreedLED, LOW);
+  digitalWrite(PinRedLED, HIGH);
+  delay(150);
+  digitalWrite(PinRedLED, LOW);
+  delay(150);
+  digitalWrite(PinRedLED, HIGH);
+  delay(150);
+  digitalWrite(PinRedLED, LOW);
+}
+//========================================================================== 
+//             MAIN   PART      
+//==========================================================================
+void printWiegandData(){
+  unsigned int lv = 0;
 
+  Serial.print("Data: ");
+  
+  for (uint8_t i = 0; i < bitCount; i++)
+  {
+    Serial.print(databits[i]);
+    
+    if ((i+1) % 8 == 0)
+      Serial.print(" ");
+
+    if (databits[bitCount-i-1]){
+      lv |= 1 << i;  
+    }
+  }
+
+  Serial.print(" Long: ");
+  Serial.print(lv);
+
+  Serial.print(" Read ");
+  Serial.print(bitCount);
+  Serial.print(" bits. ");
+}
+//==========================================================================
+void workWiegand26(){
+  // standard 26 bit format
+  // facility code = bits 2 to 9
+  for (uint8_t i=2; i<=9; i++){
+     facilityCode <<=1;
+     facilityCode |= databits[i];
+  }
+  // card code = bits 10 to 23
+  for (uint8_t i=9; i<25; i++){
+     cardCode <<=1;
+     cardCode |= databits[i];
+  }
+  sendCode();  
+}
+//==========================================================================
+void workWiegand32(){
+  for (uint8_t i=0; i<=15; i++){
+     facilityCode <<=1;
+     facilityCode |= databits[i];
+  }
+  for (uint8_t i=16; i<=31; i++){
+     cardCode <<=1;
+     cardCode |= databits[i];
+  }
+  sendCode();  
+}
+//==========================================================================
+void workWiegand37(){
+  // 37 bit HID Corporate H10304 format
+  // facility code = bits 1 to 16
+  for (uint8_t i=1; i<=16; i++){
+     facilityCode <<=1;
+     facilityCode |= databits[i];
+  }
+  // card code = bits 15 to 35 ???
+  for (uint8_t i=15; i<=35; i++){
+     cardCode <<=1;
+     cardCode |= databits[i];
+  }
+  sendCode(); 
+}
+//==========================================================================
+void workWiegandUndecode(){
+  undecodeable_code = 0;
+  for (uint8_t i = 0; i < bitCount; i++){
+    if (databits[bitCount-i-1]){
+      undecodeable_code |= (uint64_t)1 << i;
+    }
+  }
+}
+//==========================================================================
+//    MAIN LOOP LOOP LOOP LOOP LOOP
+//==========================================================================
+void loop() {
+
+  digitalWrite(PinGreedLED, HIGH);  // Show activity
+
+  // This waits to make sure that there have been no more data pulses before processing data
+  if (!flagDone) {
+    if (--weigand_counter == 0)
+      flagDone = 1;  
+  }
+ 
+  // if we have bits and we the weigand counter went out
+  if (bitCount > 0 && flagDone) {
+
+    #ifdef DEBUG_MODE
+    printWiegandData();
+    #endif
+
+    switch (bitCount){
+      case 37:
+        workWiegand37();
+      break;
+      case 32:
+        workWiegand32();
+      break;
+      case 26:
+        workWiegand26();
+      break;
+      default:
+        workWiegandUndecode();
+      break;
+    }
+
+    // cleanup and get ready for the next card
+    bitCount = 0;
+    facilityCode = 0;
+    cardCode = 0;
+    for (uint8_t i=0; i<MAX_BITS; i++) 
+    {
+     databits[i] = 0;
+    }
+  }
+}
+//===============================================================================
+void sendCode()
+{
+  // I really hope you can figure out what this function does
+  uint8_t buff[25];
+  uint8_t l = g_toemreader232w_p->buildMessage(buff, 25, 0x73, facilityCode, cardCode);
+
+  #ifdef DEBUG_MODE
+  Serial.print("FC = ");
+  Serial.print(facilityCode);
+  Serial.print(", CC = ");
+  Serial.print(cardCode); 
+  
+  Serial.print(" >> ");
+  for (uint8_t i = 0; i < l; i++){
+    Serial.write(buff[i]);
+  }
+  Serial.println("");
+  #endif
+
+  #ifndef DEBUG_MODE
+  sendBufToRs232(buff, l);
+  sendBufToRs485(buff, l);
+  #endif
+  
+  blink_ok();
+}
+//===============================================================================
+//         O T H E R   U T I L S
+//===============================================================================
+/*
+void printLong64Bits(uint64_t data)
+{
+      sendLong64ToRs485(data);
+      
+      #ifndef DEBUG_MODE
+      sendLong64ToRs232(data);
+      #endif
+
+      blink_ok();
+}
+*/
+//===============================================================================
+/*
+void printLong32Bits(uint32_t data)
+{
+      sendLongToRs485(data);
+      
+      #ifndef DEBUG_MODE
+      sendLongToRs232(data);
+      #endif
+
+      blink_ok();
+}
+*/
+//===============================================================================
+/*
 void sendLongToRs485(long val)
 {
     digitalWrite(SSerialTxControl1, RS485Transmit);  // Enable RS485 Transmit 
@@ -124,7 +334,9 @@ void sendLongToRs485(long val)
     delay(10);
     digitalWrite(SSerialTxControl1, RS485Receive);  // Disable RS485 Transmit        
 }
+*/
 //===============================================================================
+/*
 void sendLong64ToRs485(uint64_t val){
   long * pl;
   pl = (long*)&val;
@@ -132,8 +344,9 @@ void sendLong64ToRs485(uint64_t val){
   pl++;
   sendLongToRs485(*pl);
 }
+*/
 //==========================================================================
-
+/*
 void sendLongToRs232(long val)
 {
     for (char i = 0; i < 4; i++){
@@ -144,8 +357,9 @@ void sendLongToRs232(long val)
     //digitalWrite(PinGreedLED, LOW);  // Show activity    
     delay(10);
 }
+*/
 //===============================================================================
-
+/*
 void sendLong64ToRs232(uint64_t val){
   long * pl;
   pl = (long*)&val;
@@ -153,239 +367,6 @@ void sendLong64ToRs232(uint64_t val){
   pl++;
   sendLongToRs232(*pl);
 }
-
-//========================================================================== 
-//             MAIN         
-//========================================================================== 
-void blink_ok (){
-  digitalWrite(PinGreedLED, LOW);
-  delay(150);
-  digitalWrite(PinGreedLED, HIGH);
-  delay(150);
-  digitalWrite(PinGreedLED, LOW);
-  delay(150);
-}
+*/
 //===============================================================================
-void blink_error (){
-  digitalWrite(PinGreedLED, LOW);
-  digitalWrite(PinRedLED, HIGH);
-  delay(150);
-  digitalWrite(PinRedLED, LOW);
-  delay(150);
-  digitalWrite(PinRedLED, HIGH);
-  delay(150);
-  digitalWrite(PinRedLED, LOW);
-}
-//===============================================================================
-void loop() {
 
-  //long x = 305441741;
-  digitalWrite(PinGreedLED, HIGH);  // Show activity
-  // This waits to make sure that there have been no more data pulses before processing data
-  if (!flagDone) {
-    if (--weigand_counter == 0)
-      flagDone = 1;  
-  }
- 
-  // if we have bits and we the weigand counter went out
-  if (bitCount > 0 && flagDone) {
-    unsigned char i;
-
-    unsigned int lv = 0;
-
-    undecodeable_code = 0;
-
-    #ifdef DEBUG_MODE
-    Serial.print("Data: ");
-    #endif
-    
-    for (i = 0; i < bitCount; i++)
-    {
-      #ifdef DEBUG_MODE
-      Serial.print(databits[i]);
-      
-      if ((i+1) % 8 == 0)
-        Serial.print(" ");
-
-      #endif  
-
-      if (databits[bitCount-i-1]){
-        lv |= 1 << i;  
-        undecodeable_code |= (uint64_t)1 << i;
-      }
-    }
-
-    #ifdef DEBUG_MODE
-    Serial.print(" Long: ");
-    Serial.print(lv);
-    #endif
-
-    //sendLongToRs485(lv);
-
-    #ifdef DEBUG_MODE
-    Serial.print(" Read ");
-    Serial.print(bitCount);
-    Serial.print(" bits. ");
-    #endif
- 
-    // we will decode the bits differently depending on how many bits we have
-    // see www.pagemac.com/azure/data_formats.php for mor info
-    
-    if (bitCount == 37)
-    {
-      #ifdef PARSE_WIEGAND_37
-      
-      // 37 bit HID Corporate H10304 format
-      // facility code = bits 1 to 16
-      for (i=4; i<=19; i++)
-      {
-         facilityCode <<=1;
-         facilityCode |= databits[i];
-      }
- 
-      // card code = bits 15 to 35 ???
-      for (i=20; i<=35; i++)
-      {
-         cardCode <<=1;
-         cardCode |= databits[i];
-      }
- 
-      printBits();
-
-      #endif // PARSE_WIEGAND_37
-      
-      #ifndef PARSE_WIEGAND_37
-        printLong64Bits(undecodeable_code);
-      #endif
-      
-    }
-    else if (bitCount == 26)
-    {
-      #ifdef PARSE_WIEGAND_26
-      // standard 26 bit format
-      // facility code = bits 2 to 9
-      for (i=1; i<9; i++)
-      {
-         facilityCode <<=1;
-         facilityCode |= databits[i];
-      }
- 
-      // card code = bits 10 to 23
-      for (i=9; i<25; i++)
-      {
-         cardCode <<=1;
-         cardCode |= databits[i];
-      }
- 
-      printBits();  
-
-      #endif // PARSE_WIEGAND_26
-        
-      #ifndef PARSE_WIEGAND_26
-        printLong32Bits(lv);
-      #endif
-      
-    }
-    else if (bitCount == 32){
-    
-      #ifdef DEBUG_MODE
-      Serial.println(""); 
-      Serial.println("------ Wiegang 32 ------");      
-      #endif
-
-      for (i=0; i<=15; i++)
-      {
-         facilityCode <<=1;
-         facilityCode |= databits[i];
-      }
- 
-      // card code = bits 10 to 23
-      for (i=16; i<=31; i++)
-      {
-         cardCode <<=1;
-         cardCode |= databits[i];
-      }
- 
-      printBits();  
-
-      
-    } 
-    else {
-      // you can add other formats if you want!
-      #ifdef DEBUG_MODE
-      Serial.println("Unable to decode."); 
-      #endif
-      blink_error ();
-      
-      sendLong64ToRs485(undecodeable_code);
-      
-      #ifndef DEBUG_MODE
-      sendLong64ToRs232(undecodeable_code);
-      #endif
-
-
-    }
- 
-     // cleanup and get ready for the next card
-     bitCount = 0;
-     facilityCode = 0;
-     cardCode = 0;
-     for (i=0; i<MAX_BITS; i++) 
-     {
-       databits[i] = 0;
-     }
-  }
-}
-//===============================================================================
-void printBits()
-{
-      // I really hope you can figure out what this function does
-      #ifdef DEBUG_MODE
-      Serial.print("FC = ");
-      Serial.print(facilityCode);
-      Serial.print(", CC = ");
-      Serial.println(cardCode); 
-
-      uint8_t buff[25];
-      uint8_t l = g_toemreader232w_p->buildMessage(buff, 25, 0x73, facilityCode, cardCode);
-      Serial.println("");
-      for (uint8_t i = 0; i < l; i++){
-        Serial.write(buff[i]);
-      }
-      Serial.println("*");
-       
-      
-
-      
-      #endif
-      
-      sendLongToRs485(cardCode);
-      
-      #ifndef DEBUG_MODE
-      sendLongToRs232(cardCode);
-      #endif
-
-      blink_ok();
-}
-//===============================================================================
-void printLong64Bits(uint64_t data)
-{
-      sendLong64ToRs485(data);
-      
-      #ifndef DEBUG_MODE
-      sendLong64ToRs232(data);
-      #endif
-
-      blink_ok();
-}
-//===============================================================================
-void printLong32Bits(uint32_t data)
-{
-      sendLongToRs485(data);
-      
-      #ifndef DEBUG_MODE
-      sendLongToRs232(data);
-      #endif
-
-      blink_ok();
-}
