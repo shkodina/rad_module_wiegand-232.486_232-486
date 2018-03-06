@@ -3,7 +3,9 @@
 #include "toemreader232w.h"
 
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
+//#define USEWIEGANDBAUDTRIM 50
+#define DONOTSENDFACILITYCODE
 
 //========================================================================== 
 //             RS485         
@@ -57,6 +59,14 @@ void ISR_INT0()
   Serial.print("0");   // uncomment this line to display raw binary
   #endif
   
+  #ifdef USEWIEGANDBAUDTRIM
+  static unsigned long st_time = 0;
+  long delta = micros() - st_time;
+  if (delta < 0) delta = 0 - delta;
+  if (delta < USEWIEGANDBAUDTRIM) return;
+  st_time = micros();  
+  #endif
+  
   bitCount++;
   flagDone = 0;
   weigand_counter = WEIGAND_WAIT_TIME;  
@@ -70,6 +80,14 @@ void ISR_INT1()
   Serial.print("1");   // uncomment this line to display raw binary
   #endif
   
+  #ifdef USEWIEGANDBAUDTRIM
+  static unsigned long st_time = 0;
+  long delta = micros() - st_time;
+  if (delta < 0) delta = 0 - delta;
+  if (delta < USEWIEGANDBAUDTRIM) return;
+  st_time = micros();  
+  #endif
+
   databits[bitCount] = 1;
   bitCount++;
   flagDone = 0;
@@ -269,7 +287,11 @@ void sendCode()
 {
   // I really hope you can figure out what this function does
   uint8_t buff[25];
-  uint8_t l = g_toemreader232w_p->buildMessage(buff, 25, 0x73, facilityCode, cardCode);
+  uint16_t card_id = facilityCode;
+  #ifdef DONOTSENDFACILITYCODE
+  card_id = 0;
+  #endif
+  uint8_t l = g_toemreader232w_p->buildMessage(buff, 25, 0x73, card_id, cardCode);
 
   #ifdef DEBUG_MODE
   Serial.print("FC = ");
